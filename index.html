@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
+<script>document.documentElement.classList.add('js')</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Novendra Ilham — Web Developer & E-Commerce Specialist Surabaya</title>
@@ -25,6 +26,7 @@
 
 <!-- Theme -->
 <meta name="theme-color" content="#0a0a12">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
 
 <!-- Structured Data: Person + ProfessionalService -->
 <script type="application/ld+json">
@@ -168,6 +170,11 @@ body::after{
 }
 .eyebrow::before{content:"";width:2.5rem;height:1px;background:var(--accent)}
 section{padding-block:var(--space-5)}
+/* skip render sampai mendekati viewport — perf gratis */
+#about,#services,#stats,#testimonial,.contact{
+  content-visibility:auto;
+  contain-intrinsic-size:auto 600px;
+}
 
 /* ============================================
    NAVBAR
@@ -191,8 +198,14 @@ section{padding-block:var(--space-5)}
 .logo{
   font-family:var(--font-display);font-weight:700;font-size:1.15rem;
   letter-spacing:.02em;
+  display:flex;align-items:center;gap:.6rem;
 }
 .logo em{color:var(--accent);font-style:normal}
+.logo-mark{
+  width:30px;height:30px;flex:0 0 30px;
+  transition:transform .5s var(--ease-out);
+}
+.logo:hover .logo-mark{transform:rotate(360deg)}
 .nav-links{display:flex;gap:2.2rem;list-style:none}
 .nav-links a{
   font-size:.88rem;color:var(--text-dim);
@@ -505,10 +518,10 @@ section{padding-block:var(--space-5)}
 .footer-inner{width:var(--container);margin-inline:auto;display:flex;justify-content:space-between;flex-wrap:wrap;gap:.6rem}
 
 /* ============================================
-   REVEAL (basic scroll reveal — upgraded in Phase 3)
+   REVEAL (hanya aktif saat JS jalan — no-JS fallback aman)
    ============================================ */
-.reveal{opacity:0;transform:translateY(28px);transition:opacity .8s var(--ease-out),transform .8s var(--ease-out)}
-.reveal.in{opacity:1;transform:none}
+.js .reveal{opacity:0;transform:translateY(28px);transition:opacity .8s var(--ease-out),transform .8s var(--ease-out)}
+.js .reveal.in{opacity:1;transform:none}
 
 /* ============================================
    PHASE 3 — PRELOADER
@@ -516,10 +529,11 @@ section{padding-block:var(--space-5)}
 .preloader{
   position:fixed;inset:0;z-index:9999;
   background:var(--bg);
-  display:flex;align-items:flex-end;justify-content:flex-end;
+  display:none;align-items:flex-end;justify-content:flex-end;
   padding:clamp(1.5rem,4vw,3rem);
   transition:transform .9s var(--ease-out);
 }
+.js .preloader{display:flex}
 .preloader.done{transform:translateY(-100%)}
 .preloader-count{
   font-family:var(--font-display);font-weight:700;
@@ -533,7 +547,14 @@ section{padding-block:var(--space-5)}
   font-family:var(--font-display);font-size:.8rem;
   letter-spacing:.3em;text-transform:uppercase;color:var(--text-faint);
 }
-body.loading{overflow:hidden}
+.js body.loading{overflow:hidden}
+
+/* keyboard focus tetap terlihat meski custom cursor aktif */
+:focus-visible{
+  outline:2px solid var(--accent);
+  outline-offset:4px;
+  border-radius:4px;
+}
 
 /* ============================================
    PHASE 3 — SCROLL PROGRESS
@@ -660,7 +681,15 @@ body.loading{overflow:hidden}
 <!-- ================= NAVBAR ================= -->
 <nav class="nav" id="nav">
   <div class="nav-inner">
-    <a href="#" class="logo">novendra<em>.</em>dev</a>
+    <a href="#" class="logo">
+      <svg class="logo-mark" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+        <path d="M17 51V13" stroke="#ECEAE4" stroke-width="7" stroke-linecap="round"/>
+        <path d="M47 39V13" stroke="#ECEAE4" stroke-width="7" stroke-linecap="round"/>
+        <path d="M17 13L47 51" stroke="#FFB454" stroke-width="7" stroke-linecap="round"/>
+        <rect x="43" y="47" width="8" height="8" rx="1.5" fill="#FFB454"/>
+      </svg>
+      novendra<em>.</em>dev
+    </a>
     <ul class="nav-links" id="navLinks">
       <li><a href="#about">About</a></li>
       <li><a href="#services">Services</a></li>
@@ -960,6 +989,15 @@ navLinks.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
   burger.classList.remove('open');
   document.body.style.overflow = '';
 }));
+addEventListener('keydown', e => {
+  if (e.key === 'Escape' && navLinks.classList.contains('open')) {
+    navLinks.classList.remove('open');
+    burger.classList.remove('open');
+    burger.setAttribute('aria-expanded', 'false');
+    document.body.style.overflow = '';
+    burger.focus();
+  }
+});
 
 /* ---------- Hero: animated gradient mesh (canvas 2D) ---------- */
 const canvas = document.getElementById('mesh');
