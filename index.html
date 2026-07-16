@@ -99,6 +99,21 @@
 <noscript><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"></noscript>
 <style>
 /* ============================================
+   FALLBACK FONTS — metrik disamakan dengan webfont
+   supaya swap tidak menggeser layout (CLS fix)
+   ============================================ */
+@font-face{
+  font-family:'SG Fallback';
+  src:local('Arial');
+  size-adjust:101%;ascent-override:97%;descent-override:29%;line-gap-override:0%;
+}
+@font-face{
+  font-family:'Inter Fallback';
+  src:local('Arial');
+  size-adjust:107%;ascent-override:90%;descent-override:22.5%;line-gap-override:0%;
+}
+
+/* ============================================
    PHASE 1 — DESIGN TOKENS
    ============================================ */
 :root{
@@ -110,13 +125,13 @@
   --line-strong:   rgba(255,255,255,.16);
   --text:          #eceae4;
   --text-dim:      #9a98a3;
-  --text-faint:    #5c5a66;
+  --text-faint:    #8b8996;
   --accent:        #ffb454;
   --accent-deep:   #e08b1f;
   --accent-ink:    #1a1204;
 
-  --font-display: 'Space Grotesk', system-ui, sans-serif;
-  --font-body:    'Inter', system-ui, sans-serif;
+  --font-display: 'Space Grotesk', 'SG Fallback', system-ui, sans-serif;
+  --font-body:    'Inter', 'Inter Fallback', system-ui, sans-serif;
 
   --fs-hero:  clamp(3.4rem, 13vw, 10rem);
   --fs-h2:    clamp(2rem, 5.5vw, 4rem);
@@ -183,15 +198,20 @@ section{padding-block:var(--space-5)}
    ============================================ */
 .nav{
   position:fixed;top:0;left:0;right:0;z-index:100;
-  transition:background .4s,border-color .4s,backdrop-filter .4s;
+  transition:border-color .4s;
   border-bottom:1px solid transparent;
 }
-.nav.scrolled{
+/* blur di pseudo-element — backdrop-filter di .nav sendiri akan
+   membuat containing block dan merusak posisi fixed menu mobile */
+.nav::before{
+  content:"";position:absolute;inset:0;z-index:-1;
   background:rgba(10,10,18,.72);
   backdrop-filter:blur(14px);
   -webkit-backdrop-filter:blur(14px);
-  border-bottom-color:var(--line);
+  opacity:0;transition:opacity .4s;
 }
+.nav.scrolled{border-bottom-color:var(--line)}
+.nav.scrolled::before{opacity:1}
 .nav-inner{
   width:var(--container);margin-inline:auto;
   display:flex;align-items:center;justify-content:space-between;
@@ -256,16 +276,16 @@ section{padding-block:var(--space-5)}
   text-transform:uppercase;
   line-height:.92;
 }
+.hero-name span{display:block}
 .hero-name .outline{
   color:transparent;
   -webkit-text-stroke:1.5px var(--text);
-  display:block;
 }
 .hero-role{
   margin-top:var(--space-3);
   font-size:clamp(1rem, 2vw, 1.35rem);
   color:var(--text-dim);
-  max-width:34ch;
+  max-width:30rem;
 }
 .hero-role strong{color:var(--text);font-weight:600}
 .hero-cta-row{display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:var(--space-3)}
@@ -628,12 +648,14 @@ section{padding-block:var(--space-5)}
     position:fixed;inset:0;
     background:rgba(10,10,18,.96);
     backdrop-filter:blur(16px);
+    -webkit-backdrop-filter:blur(16px);
     flex-direction:column;justify-content:center;align-items:center;gap:2.4rem;
     transform:translateY(-100%);
-    transition:transform .5s var(--ease-out);
+    visibility:hidden;
+    transition:transform .5s var(--ease-out), visibility 0s .5s;
     z-index:105;
   }
-  .nav-links.open{transform:none}
+  .nav-links.open{transform:none;visibility:visible;transition:transform .5s var(--ease-out)}
   .nav-links a{font-size:1.4rem;font-family:var(--font-display)}
   .burger{display:block}
   .about-grid{grid-template-columns:1fr;gap:var(--space-3)}
@@ -1013,8 +1035,9 @@ const blobs = [
 ];
 
 function resize() {
-  W = canvas.width  = innerWidth  * Math.min(devicePixelRatio, 2);
-  H = canvas.height = innerHeight * Math.min(devicePixelRatio, 2);
+  const dpr = Math.min(devicePixelRatio, 1.25); // hemat CPU mobile
+  W = canvas.width  = innerWidth  * dpr;
+  H = canvas.height = innerHeight * dpr;
 }
 resize();
 addEventListener('resize', resize, { passive: true });
@@ -1046,9 +1069,13 @@ function drawMesh(t) {
 }
 
 if (!reduceMotion) {
+  let lastFrame = 0;
   (function loop(t) {
-    // hanya render saat hero terlihat
-    if (scrollY < innerHeight * 1.2) drawMesh(t);
+    // throttle 30fps, hanya saat hero terlihat & tab aktif
+    if (!document.hidden && scrollY < innerHeight * 1.2 && t - lastFrame > 33) {
+      drawMesh(t);
+      lastFrame = t;
+    }
     requestAnimationFrame(loop);
   })(0);
 } else {
@@ -1069,9 +1096,10 @@ document.querySelectorAll('.reveal').forEach(el => revealIO.observe(el));
 /* ---------- Tilt 3D cards ---------- */
 if (!isTouch && !reduceMotion) {
   document.querySelectorAll('.tilt').forEach(card => {
-    let raf = null;
+    let raf = null, rect = null;
+    card.addEventListener('mouseenter', () => { rect = card.getBoundingClientRect(); });
     card.addEventListener('mousemove', e => {
-      const rect = card.getBoundingClientRect();
+      if (!rect) rect = card.getBoundingClientRect();
       const px = (e.clientX - rect.left) / rect.width;
       const py = (e.clientY - rect.top) / rect.height;
       card.style.setProperty('--mx', (px * 100) + '%');
@@ -1094,17 +1122,26 @@ const workWrap = document.getElementById('workWrap');
 const workTrack = document.getElementById('workTrack');
 const workBar = document.getElementById('workBar');
 
+let workRaf = false, workTotal = 0, workMax = 0;
+function measureWork() {
+  workTotal = workWrap.offsetHeight - innerHeight;
+  workMax = workTrack.scrollWidth - innerWidth + innerWidth * .06;
+}
 function updateWork() {
   if (innerWidth <= 768) return; // mobile: vertical stack
+  if (!workTotal) measureWork();
   const rect = workWrap.getBoundingClientRect();
-  const total = workWrap.offsetHeight - innerHeight;
-  const progress = Math.min(Math.max(-rect.top / total, 0), 1);
-  const maxShift = workTrack.scrollWidth - innerWidth + innerWidth * .06;
-  workTrack.style.transform = `translateX(${-progress * maxShift}px)`;
+  const progress = Math.min(Math.max(-rect.top / workTotal, 0), 1);
+  workTrack.style.transform = `translateX(${-progress * workMax}px)`;
   workBar.style.width = (progress * 100) + '%';
 }
-addEventListener('scroll', updateWork, { passive: true });
-addEventListener('resize', updateWork, { passive: true });
+function scheduleWork() {
+  if (workRaf) return;
+  workRaf = true;
+  requestAnimationFrame(() => { updateWork(); workRaf = false; });
+}
+addEventListener('scroll', scheduleWork, { passive: true });
+addEventListener('resize', () => { measureWork(); scheduleWork(); }, { passive: true });
 updateWork();
 
 /* ---------- Stats counter ---------- */
@@ -1163,19 +1200,32 @@ function scramble(el, duration = 900) {
   const final = el.dataset.final || el.textContent;
   el.dataset.final = final;
   if (reduceMotion) { el.textContent = final; return; }
+  // sel per karakter dengan lebar terkunci sesuai huruf finalnya → zero layout shift
+  el.textContent = '';
+  const cells = [...final].map(ch => {
+    const s = document.createElement('span');
+    s.textContent = ch;
+    s.style.display = 'inline-block';
+    s.style.whiteSpace = 'pre';
+    el.appendChild(s);
+    return s;
+  });
+  cells.forEach(s => {
+    s.style.width = s.getBoundingClientRect().width + 'px';
+    s.style.textAlign = 'center';
+  });
   const t0 = performance.now();
   (function tick(now) {
     const p = Math.min((now - t0) / duration, 1);
     const solved = Math.floor(p * final.length);
-    let out = '';
-    for (let i = 0; i < final.length; i++) {
-      if (final[i] === ' ') { out += ' '; continue; }
-      out += i < solved
+    cells.forEach((s, i) => {
+      if (final[i] === ' ') return;
+      s.textContent = i < solved
         ? final[i]
         : SCRAMBLE_CHARS[Math.random() * SCRAMBLE_CHARS.length | 0];
-    }
-    el.textContent = out;
+    });
     if (p < 1) requestAnimationFrame(tick);
+    else el.textContent = final; // bersihkan sel setelah selesai
   })(t0);
 }
 
@@ -1187,10 +1237,14 @@ function finishPreload() {
   preloader.classList.add('done');
   document.body.classList.remove('loading');
   setTimeout(() => preloader.remove(), 1000);
-  // scramble hero setelah curtain naik
-  document.querySelectorAll('[data-scramble]').forEach((el, i) => {
-    setTimeout(() => scramble(el, 900 + i * 200), 250 + i * 120);
-  });
+  // scramble hero setelah curtain naik DAN webfont siap (hindari swap di tengah animasi)
+  const startScramble = () => {
+    document.querySelectorAll('[data-scramble]').forEach((el, i) => {
+      setTimeout(() => scramble(el, 900 + i * 200), 250 + i * 120);
+    });
+  };
+  const fontsReady = (document.fonts && document.fonts.ready) || Promise.resolve();
+  Promise.race([fontsReady, new Promise(r => setTimeout(r, 1200))]).then(startScramble);
 }
 
 if (reduceMotion) {
@@ -1250,8 +1304,10 @@ if (!isTouch && !reduceMotion) {
 if (!isTouch && !reduceMotion) {
   document.querySelectorAll('.magnetic').forEach(el => {
     const strength = 22;
+    let r = null;
+    el.addEventListener('mouseenter', () => { r = el.getBoundingClientRect(); });
     el.addEventListener('mousemove', e => {
-      const r = el.getBoundingClientRect();
+      if (!r) r = el.getBoundingClientRect();
       const x = (e.clientX - r.left - r.width / 2) / (r.width / 2);
       const y = (e.clientY - r.top - r.height / 2) / (r.height / 2);
       el.style.transition = 'transform .1s';
